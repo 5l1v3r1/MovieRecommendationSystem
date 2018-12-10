@@ -12,7 +12,7 @@ import java.util.*;
 
 public class Main {
 
-    final static String[] GENRES = {"Action", "Adventure", "Animation",
+    private final static String[] GENRES = {"Action", "Adventure", "Animation",
                                     "Children's", "Comedy", "Crime",
                                     "Documentary", "Drama",
                                     "Fantasy", "Film-Noir",
@@ -24,25 +24,28 @@ public class Main {
                                     "War", "Western",
                                     "(no genres listed)"};
 
-    static HashMap<Integer, User> userRatingsMap;
-    static HashMap<Integer, HashMap<String, Float>> userGenresMap;
-    static HashMap<Integer, Movie> moviesMap;
-    static Map<Integer, ArrayList<Integer>> userLSH;
+    private static HashMap<Integer, User> userRatingsMap;
+    private static HashMap<Integer, HashMap<String, Float>> userGenresMap;
+    private static HashMap<Integer, Movie> moviesMap;
+    private static HashMap<Integer, ArrayList<Integer>> userLSH;
+    private static HashMap<Integer, ArrayList<Rating>> userSimilarMoviesMap;
 
-
+    private static LSHSuperBit lsh = new LSHSuperBit(GENRES.length, 372, 3);
 
     public static void main(String[] args) {
         readRatingsCSV();
         readMoviesCSV();
         generateUserGenreMatrix();
         computeSimilarUsersLSH();
-        System.out.println(moviesMap.size());
+        System.out.println(userRatingsMap.size());
 
-        System.out.println(Collections.singletonList(userLSH.get(0)));
+        //getRecommendedMoviesFromSimilarUsers();
+        computeRecommendedMoviesFromSimilarUsers(1);
+        getRecommendedMovies(1);
     }
 
     private static void readRatingsCSV() {
-        String csvFile = "/Users/boran/Desktop/CS425-Project/ml-20m/ratings.csv";
+        String csvFile = "/Users/boranyildirim/Downloads/ml-20m/ratings.csv";
         String line = "";
         String cvsSplitBy = ",";
 
@@ -79,7 +82,7 @@ public class Main {
     }
 
     private static void readMoviesCSV() {
-        String csvFile = "/Users/boran/Desktop/CS425-Project/ml-20m/movies.csv";
+        String csvFile = "/Users/boranyildirim/Downloads/ml-20m/movies.csv";
         String line = "";
         String cvsSplitBy = ",";
 
@@ -137,22 +140,19 @@ public class Main {
     private static void computeSimilarUsersLSH() {
         userLSH = new HashMap<>();
 
-        // R^n
-        int n = 3;
-
-        int stages = GENRES.length;
-        int buckets = 165;
-
-        LSHSuperBit lsh = new LSHSuperBit(stages, buckets, n);
-
         for (Map.Entry<Integer, HashMap<String, Float>> user: userGenresMap.entrySet()) {
-            ArrayList<Float> vector = new ArrayList<>();
-            for (String genre: GENRES) {
-                vector.add(user.getValue().get(genre));
-            }
+            ArrayList<Float> vector = mapToList(user.getValue());
             int[] hash = lsh.hash(vector);
             addSimilarUsers(hash[0], user.getKey());
         }
+    }
+
+    private static ArrayList<Float> mapToList(HashMap<String, Float> map) {
+        ArrayList<Float> vector = new ArrayList<>();
+        for (String genre: GENRES) {
+            vector.add(map.get(genre));
+        }
+        return vector;
     }
 
     private static void addSimilarUsers(Integer hashValue, Integer userId) {
@@ -166,6 +166,64 @@ public class Main {
             tmp.add(userId);
             userLSH.put(hashValue, tmp);
         }
+    }
+
+    private static int getHashedBucketOfUser (int userId) {
+        int hash[] = lsh.hash(mapToList(userGenresMap.get(userId)));
+        return hash[0];
+    }
+
+    private static void getRecommendedMoviesFromSimilarUsers() {
+        for (Integer userId: userGenresMap.keySet()) {
+            computeRecommendedMoviesFromSimilarUsers(userId);
+        }
+    }
+
+    private static void computeRecommendedMoviesFromSimilarUsers (int userId) {
+        System.out.println("computeRecommendedMoviesFromSimilarUsers");
+        int bucket = getHashedBucketOfUser(userId);
+        ArrayList<Integer> similarUsers = userLSH.get(bucket);
+        userSimilarMoviesMap = new HashMap<>();
+
+        for (Integer uid : similarUsers) {
+            if (uid != userId) {
+                ArrayList<Rating> ratings = userRatingsMap.get(uid).getRatings();
+
+                for (Rating r : ratings) {
+                    if (r.getRating() >= 0.75) {
+                        addRecommendedMovies(userId, r);
+                    }
+                }
+            }
+        }
+        System.out.println("end computeRecommendedMoviesFromSimilarUsers");
+    }
+
+    private static void addRecommendedMovies(Integer userId, Rating r) {
+        if (userSimilarMoviesMap.containsKey(userId)) {
+            if (!userSimilarMoviesMap.get(userId).contains(r)) {
+                userSimilarMoviesMap.get(userId).add(r);
+            }
+        }
+        else {
+            ArrayList<Rating> tmp = new ArrayList<>();
+            tmp.add(r);
+            userSimilarMoviesMap.put(userId, tmp);
+        }
+    }
+
+    private static ArrayList<Movie> getRecommendedMovies(int userId) {
+        System.out.println("getRecommendedMovies");
+        ArrayList<Movie> movies = new ArrayList<>();
+        ArrayList<Rating> userRatings = userSimilarMoviesMap.get(userId);
+        for (Rating r : userRatings) {
+            movies.add(moviesMap.get(r.getMovieId()));
+        }
+
+        for (Movie m: movies) {
+            System.out.println(m.getMovieId() + ", " + m.getTitle());
+        }
+        return movies;
     }
 
     private static void movieMovieFiltering() {
