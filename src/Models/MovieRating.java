@@ -12,4 +12,16 @@ public class MovieRating extends Rating {
         return timestamp;
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Rating) {
+            Rating r = (Rating) obj;
+            return super.getId() == r.getId();
+        }
+        else if (obj instanceof Movie) {
+            Movie m = (Movie) obj;
+            return super.getId() == m.getMovieId();
+        }
+        return false;
+    }
 }

@@ -38,17 +38,56 @@ public class SuperBit {
         // Denote H = [v1, v2, ..., vK].
         int code_length = n * l;
 
+
         double[][] v = new double[code_length][d];
 
-        for (int i = 0; i < code_length; i++) {
-            double[] vector = new double[d];
-            for (int j = 0; j < d; j++) {
-                vector[j] = rand.nextGaussian();
-            }
+        new Thread(() -> {
+            for (int i = 0; i < code_length / 4; i++) {
+                double[] vector = new double[d];
+                for (int j = 0; j < d; j++) {
+                    vector[j] = rand.nextGaussian();
+                }
 
-            normalize(vector);
-            v[i] = vector;
-        }
+                normalize(vector);
+                v[i] = vector;
+            }
+        }).start();
+
+        new Thread(() -> {
+            for (int i = code_length / 4; i < code_length / 2; i++) {
+                double[] vector = new double[d];
+                for (int j = 0; j < d; j++) {
+                    vector[j] = rand.nextGaussian();
+                }
+
+                normalize(vector);
+                v[i] = vector;
+            }
+        }).start();
+
+        new Thread(() -> {
+            for (int i = code_length / 2; i < 3 * code_length / 4; i++) {
+                double[] vector = new double[d];
+                for (int j = 0; j < d; j++) {
+                    vector[j] = rand.nextGaussian();
+                }
+
+                normalize(vector);
+                v[i] = vector;
+            }
+        }).start();
+
+        new Thread(() -> {
+            for (int i = 3 * code_length / 4; i < code_length; i++) {
+                double[] vector = new double[d];
+                for (int j = 0; j < d; j++) {
+                    vector[j] = rand.nextGaussian();
+                }
+
+                normalize(vector);
+                v[i] = vector;
+            }
+        }).start();
 
 
         // for i = 0 to L - 1 do
@@ -61,7 +100,6 @@ public class SuperBit {
         //     end for
         //   end for
         // Output: H˜ = [w1, w2, ..., wK]
-
         double[][] w = new double[code_length][d];
         for (int i = 0; i <= l - 1; i++) {
             for (int j = 1; j <= n; j++) {
@@ -95,10 +133,51 @@ public class SuperBit {
 
     final boolean[] signature(final float[] vector) {
         boolean[] sig = new boolean[this.hyperplanes.length];
-        for (int i = 0; i < this.hyperplanes.length; i++) {
-            sig[i] = (dotProduct(this.hyperplanes[i], vector) >= 0);
-        }
+
+        Thread thread1 = new Thread(() -> {
+            for (int i = 0; i < this.hyperplanes.length / 4; i++) {
+                sig[i] = (dotProduct(this.hyperplanes[i], vector) >= 0);
+            }
+        });
+
+        Thread thread2 = new Thread(() -> {
+            for (int i = this.hyperplanes.length / 4; i < this.hyperplanes.length / 2; i++) {
+                sig[i] = (dotProduct(this.hyperplanes[i], vector) >= 0);
+            }
+        });
+
+        Thread thread3 = new Thread(() -> {
+            for (int i = this.hyperplanes.length / 2; i < 3 * this.hyperplanes.length / 4; i++) {
+                sig[i] = (dotProduct(this.hyperplanes[i], vector) >= 0);
+            }
+        });
+
+        Thread thread4 = new Thread(() -> {
+            for (int i = 3 * this.hyperplanes.length / 4; i < this.hyperplanes.length; i++) {
+                sig[i] = (dotProduct(this.hyperplanes[i], vector) >= 0);
+            }
+        });
+
+        runAndJoinThreads(thread1, thread2, thread3, thread4);
+
+
         return sig;
+    }
+
+    static void runAndJoinThreads(Thread thread1, Thread thread2, Thread thread3, Thread thread4) {
+        thread1.start();
+        thread2.start();
+        thread3.start();
+        thread4.start();
+
+        try {
+            thread1.join();
+            thread2.join();
+            thread3.join();
+            thread4.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     static float[] listToArray(ArrayList<Float> vector) {

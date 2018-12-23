@@ -1,6 +1,7 @@
 package com.cs425;
 
 import LSH.LSHSuperBit;
+import LSH.SuperBit;
 import Models.Movie;
 import Models.MovieRating;
 import Models.Rating;
@@ -8,6 +9,9 @@ import Models.User;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
+import java.util.stream.IntStream;
 
 public class Main {
 
@@ -33,16 +37,16 @@ public class Main {
     private static float[][] userGenresMap = new float[USER_NUMBER][GENRES.length];
 
     // since movies are blank ids it is better to store them in a hashmap
-    private static HashMap<Integer, Movie> moviesMap = new HashMap<>();
+    private static ConcurrentHashMap<Integer, Movie> moviesMap = new ConcurrentHashMap<>();
 
-    private static HashMap<Integer, ArrayList<Integer>> userLSH = new HashMap<>();
+    private static ConcurrentHashMap<Integer, ArrayList<Integer>> userLSH = new ConcurrentHashMap<>();
     private static ArrayList<ArrayList<MovieRating>> userSimilarMoviesMap = new ArrayList<>();
 
-    private static HashMap<Integer, ArrayList<Integer>> moviesLSH = new HashMap<>();
+    private static ConcurrentHashMap<Integer, ArrayList<Integer>> moviesLSH = new ConcurrentHashMap<>();
 
     private static LSHSuperBit userUserLSH = new LSHSuperBit(31, 1488, GENRES.length);
 
-    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(10, 100, USER_NUMBER);
+    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(30, 100, 10000);
 
     private static float globalMovieRatingsAverage = 0.0f;
 
@@ -63,7 +67,11 @@ public class Main {
         System.out.println(userRatingsMap[6].calculateRatingDeviation(userRatingsMap[6].getAverageRating(), globalMovieRatingsAverage));
         System.out.println(userRatingsMap[6].getRatingDeviation());
 
-        movieMovieFiltering();
+        computeBaselineRatings(2);
+        computeBaselineRatings(6);
+        computeBaselineRatings(50);
+        //movieMovieFiltering();
+        //System.out.println(Collections.singletonList(moviesLSH.get(1)));
         //System.out.println(Arrays.toString(moviesMap.get(1).getRatingsVector()));
         //getRecommendedMoviesFromSimilarUsers();
         //computeRecommendedMoviesFromSimilarUsers(6);
@@ -235,7 +243,7 @@ public class Main {
         System.out.println("getRecommendedMovies");
         ArrayList<Movie> movies = new ArrayList<>();
         ArrayList<MovieRating> userRatings = userSimilarMoviesMap.get(userId);
-        for (Rating r : userRatings) {
+        for (MovieRating r : userRatings) {
             if (!userRatingsMap[userId].getRatings().contains(r))
                 movies.add(moviesMap.get(r.getId()));
         }
@@ -249,9 +257,42 @@ public class Main {
 
     private static void movieMovieFiltering () {
         long start = System.currentTimeMillis();
-        computeSimilarMoviesLSH();
+        //computeSimilarMoviesLSH();
         endTimer(start);
         System.out.println(Collections.singletonList(moviesLSH.get(1)));
+    }
+
+    private static void computeBaselineRatings() {
+        for (int i = 1; i < USER_NUMBER; i++) {
+            computeBaselineRatings(i);
+        }
+    }
+
+    private static void computeBaselineRatings(int i) {
+        User user = userRatingsMap[i];
+        ArrayList<MovieRating> ratings = user.getRatings(0.75f);
+
+        for (HashMap.Entry<Integer, Movie> movie: moviesMap.entrySet()) {
+            if (!ratings.contains(movie.getValue())) {
+                double[] v1 = IntStream.range(0, movie.getValue().getRatingsVector().length).mapToDouble(j -> movie.getValue().getRatingsVector()[j]).toArray();
+
+                for (Rating r: ratings) {
+                    double[] v2 = IntStream.range(0, moviesMap.get(r.getId()).getRatingsVector().length).mapToDouble(j -> moviesMap.get(r.getId()).getRatingsVector()[j]).toArray();
+
+                    double cosineSim = SuperBit.cosineSimilarity(v1, v2);
+                    if (cosineSim > 0.4) {
+                        System.out.println("UnwatchedMovie: " + movie.getValue().getTitle() + " is similar to " +
+                                moviesMap.get(r.getId()).getTitle() + " with cosine similarity " + cosineSim);
+                        float bxi = (globalMovieRatingsAverage + user.getRatingDeviation() + movie.getValue().getRatingDeviation());
+                        System.out.println("Baseline estimate for user " + user.getUserId() + " movie " + movie.getValue().getTitle() +
+                                " is " + bxi );
+                        System.out.println("Baseline rating plus the weighted avg of deviations is " +
+                                bxi + ((cosineSim * movie.getValue().getRatingDeviation()) + (cosineSim * moviesMap.get(r.getId()).getRatingDeviation())) / (cosineSim * 2) );
+                        System.out.println();
+                    }
+                }
+            }
+        }
     }
 
     private static void computeSimilarMoviesLSH () {
@@ -267,16 +308,18 @@ public class Main {
         addSimilarEntities(bucket, movieId, moviesLSH);
     }
 
-    private static void addSimilarEntities(int bucket, int id, HashMap<Integer, ArrayList<Integer>> map) {
-        if (map.containsKey(bucket)) {
-            if (!map.get(bucket).contains(id)) {
-                map.get(bucket).add(id);
+    private static void addSimilarEntities(int bucket, int id, ConcurrentHashMap<Integer, ArrayList<Integer>> map) {
+        new Thread(() -> {
+            if (map.containsKey(bucket)) {
+                if (!map.get(bucket).contains(id)) {
+                    map.get(bucket).add(id);
+                }
             }
-        }
-        else {
-            ArrayList<Integer> tmp = new ArrayList<>();
-            tmp.add(id);
-            map.put(bucket, tmp);
-        }
+            else {
+                ArrayList<Integer> tmp = new ArrayList<>();
+                tmp.add(id);
+                map.put(bucket, tmp);
+            }
+        }).start();
     }
 }

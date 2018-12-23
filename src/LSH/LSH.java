@@ -23,16 +23,56 @@ abstract class LSH {
         // Number of rows per stage
         int rows = signature.length / stages;
 
-        for (int i = 0; i < signature.length; i++) {
-            long v = 0;
-            if (signature[i]) {
-                v = (i + 1) * LARGE_PRIME;
-            }
+        Thread thread1 = new Thread(() -> {
+            for (int i = 0; i < signature.length / 4; i++) {
+                long v = 0;
+                if (signature[i]) {
+                    v = (i + 1) * LARGE_PRIME;
+                }
 
-            // current stage
-            int j = Math.min(i / rows, stages - 1);
-            acc[j] = (acc[j] + v) % Integer.MAX_VALUE;
-        }
+                // current stage
+                int j = Math.min(i / rows, stages - 1);
+                acc[j] = (acc[j] + v) % Integer.MAX_VALUE;
+            }
+        });
+        Thread thread2 = new Thread(() -> {
+            for (int i = signature.length / 4; i < signature.length / 2; i++) {
+                long v = 0;
+                if (signature[i]) {
+                    v = (i + 1) * LARGE_PRIME;
+                }
+
+                // current stage
+                int j = Math.min(i / rows, stages - 1);
+                acc[j] = (acc[j] + v) % Integer.MAX_VALUE;
+            }
+        });
+        Thread thread3 = new Thread(() -> {
+            for (int i = signature.length / 2; i < 3 * signature.length / 4; i++) {
+                long v = 0;
+                if (signature[i]) {
+                    v = (i + 1) * LARGE_PRIME;
+                }
+
+                // current stage
+                int j = Math.min(i / rows, stages - 1);
+                acc[j] = (acc[j] + v) % Integer.MAX_VALUE;
+            }
+        });
+        Thread thread4 = new Thread(() -> {
+            for (int i = 3 * signature.length / 4; i < signature.length; i++) {
+                long v = 0;
+                if (signature[i]) {
+                    v = (i + 1) * LARGE_PRIME;
+                }
+
+                // current stage
+                int j = Math.min(i / rows, stages - 1);
+                acc[j] = (acc[j] + v) % Integer.MAX_VALUE;
+            }
+        });
+
+        SuperBit.runAndJoinThreads(thread1, thread2, thread3, thread4);
 
         int[] r = new int[stages];
         for (int i = 0; i < stages; i++) {

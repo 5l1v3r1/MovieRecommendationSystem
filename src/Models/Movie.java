@@ -55,10 +55,36 @@ public class Movie extends Entity{
     }
 
     public float[] getRatingsVector() {
-        float[] tmp = new float[USER_NUMBER];
-        for (int i = 0; i < USER_NUMBER; i++) {
+        float[] tmp = new float[10000];
+/*
+        new Thread(() -> {
+            for (int i = 0; i < 2500; i++) {
+                tmp[i] = ratings.getOrDefault(i, 0.0f);
+            }
+        }).start();
+
+        new Thread(() -> {
+            for (int i = 2500; i < 5000; i++) {
+                tmp[i] = ratings.getOrDefault(i, 0.0f);
+            }
+        }).start();
+
+        new Thread(() -> {
+            for (int i = 5000; i < 7500; i++) {
+                tmp[i] = ratings.getOrDefault(i, 0.0f);
+            }
+        }).start();
+
+        new Thread(() -> {
+            for (int i = 7500; i < 10000; i++) {
+                tmp[i] = ratings.getOrDefault(i, 0.0f);
+            }
+        }).start();
+*/
+        for (int i = 0; i < 10000; i++) {
             tmp[i] = ratings.getOrDefault(i, 0.0f);
         }
+
         return tmp;
     }
 }
