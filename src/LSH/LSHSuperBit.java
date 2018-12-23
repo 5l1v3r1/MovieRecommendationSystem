@@ -38,7 +38,7 @@ public class LSHSuperBit extends LSH {
         return superbit;
     }
 
-    private int[] hash(final float[] vector) {
+    public int[] hash(final float[] vector) {
         return hashSignature(sb.signature(vector));
     }
 
