@@ -4,15 +4,19 @@ package Models;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-public class Movie {
-    private int movieId;
+public class Movie extends Entity{
     private String title;
     private ArrayList<String> genres;
 
+    private float totalRatings;
+    private int numberOfRatings;
+
     public Movie(int movieId, String title, String genres) {
-        this.movieId = movieId;
+        super(movieId);
         this.title = title;
         genresStringToArrayList(genres);
+        totalRatings = 0.0f;
+        numberOfRatings = 0;
     }
 
     private void genresStringToArrayList(String genres) {
@@ -21,7 +25,7 @@ public class Movie {
     }
 
     public int getMovieId() {
-        return movieId;
+        return super.getId();
     }
 
     public String getTitle() {
@@ -30,5 +34,14 @@ public class Movie {
 
     public ArrayList<String> getGenres() {
         return genres;
+    }
+
+    public void addRating(float rating) {
+        totalRatings += rating;
+        numberOfRatings++;
+    }
+
+    public float getAverageRating() {
+        return totalRatings / numberOfRatings;
     }
 }

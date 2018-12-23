@@ -3,15 +3,18 @@ package Models;
 
 import java.util.ArrayList;
 
-public class User {
-    private int userId;
+public class User extends Entity {
     private ArrayList<Rating> ratings;
     private int LSHBucket;
+    private float averageRating;
+    private float ratingDeviation;
 
     public User(int userId) {
-        this.userId = userId;
+        super(userId);
         this.ratings = new ArrayList<>();
         LSHBucket = -1;
+        averageRating = -1;
+        ratingDeviation = 0.0f;
     }
 
     public void addRating(int movieId, float rating, String timestamp) {
@@ -20,7 +23,7 @@ public class User {
     }
 
     public int getUserId() {
-        return userId;
+        return super.getId();
     }
 
     public ArrayList<Rating> getRatings() {
@@ -46,6 +49,7 @@ public class User {
         }
 
         float averageRating = total / count;
+        this.averageRating = averageRating;
 
         for (Rating rating : ratings) {
             rating.setRating(rating.getRating() - averageRating);
@@ -58,5 +62,9 @@ public class User {
 
     public void setLSHBucket(int LSHBucket) {
         this.LSHBucket = LSHBucket;
+    }
+
+    public float getAverageRating() {
+        return averageRating;
     }
 }

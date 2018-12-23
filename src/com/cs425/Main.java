@@ -39,12 +39,18 @@ public class Main {
 
     private static LSHSuperBit lsh = new LSHSuperBit(31, 1488, GENRES.length);
 
+    private static float globalMovieRatingsAverage = 0.0f;
+
     public static void main(String[] args) {
         fillUserSimilarMoviesMap();
-        readRatingsCSV();
         readMoviesCSV();
+        readRatingsCSV();
         generateUserGenreMatrix();
         computeSimilarUsersLSH();
+
+        System.out.println(globalMovieRatingsAverage);
+        System.out.println(moviesMap.get(1).getAverageRating());
+        System.out.println(userRatingsMap[6].getAverageRating());
 
         //getRecommendedMoviesFromSimilarUsers();
         //computeRecommendedMoviesFromSimilarUsers(6);
@@ -56,6 +62,10 @@ public class Main {
         String line = "";
         String cvsSplitBy = ",";
 
+        // to calculate global movie rating average
+        float totalRating = 0.0f;
+        int ratingCount = 0;
+
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
             br.readLine();
 
@@ -66,18 +76,31 @@ public class Main {
 
                 User tmp = new User(Integer.parseInt(rating[0]));
 
+                int movieId = Integer.parseInt(rating[1]);
+                float movieRating = Float.parseFloat(rating[2]);
+                String timestamp = rating[3];
+
                 if (userRatingsMap[tmp.getUserId()] != null) {
-                    userRatingsMap[tmp.getUserId()].addRating(Integer.parseInt(rating[1]), Float.parseFloat(rating[2]), rating[3]);
+                    userRatingsMap[tmp.getUserId()].addRating(movieId, movieRating, timestamp);
                 }
                 else {
-                    tmp.addRating(Integer.parseInt(rating[1]), Float.parseFloat(rating[2]), rating[3]);
+                    tmp.addRating(movieId, movieRating, timestamp);
                     userRatingsMap[tmp.getUserId()] = tmp;
                 }
+
+                // add current rating to the movie object to calculate average ratings
+                moviesMap.get(movieId).addRating(movieRating);
+
+                totalRating += Float.parseFloat(rating[2]);
+                ratingCount++;
             }
 
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        globalMovieRatingsAverage = totalRating / ratingCount;
+
         normalizeRatings();
     }
 
