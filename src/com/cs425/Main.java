@@ -2,6 +2,7 @@ package com.cs425;
 
 import LSH.LSHSuperBit;
 import Models.Movie;
+import Models.MovieRating;
 import Models.Rating;
 import Models.User;
 
@@ -11,7 +12,7 @@ import java.util.*;
 public class Main {
 
     // +1 for id convenience
-    private final static int USER_NUMBER = 138494;
+    public final static int USER_NUMBER = 138494;
 
     private final static String[] GENRES =
             {"Action", "Adventure", "Animation",
@@ -35,23 +36,35 @@ public class Main {
     private static HashMap<Integer, Movie> moviesMap = new HashMap<>();
 
     private static HashMap<Integer, ArrayList<Integer>> userLSH = new HashMap<>();
-    private static ArrayList<ArrayList<Rating>> userSimilarMoviesMap = new ArrayList<>();
+    private static ArrayList<ArrayList<MovieRating>> userSimilarMoviesMap = new ArrayList<>();
 
-    private static LSHSuperBit lsh = new LSHSuperBit(31, 1488, GENRES.length);
+    private static HashMap<Integer, ArrayList<Integer>> moviesLSH = new HashMap<>();
+
+    private static LSHSuperBit userUserLSH = new LSHSuperBit(31, 1488, GENRES.length);
+
+    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(10, 100, USER_NUMBER);
 
     private static float globalMovieRatingsAverage = 0.0f;
 
     public static void main(String[] args) {
-        fillUserSimilarMoviesMap();
+        //fillUserSimilarMoviesMap();
         readMoviesCSV();
         readRatingsCSV();
-        generateUserGenreMatrix();
-        computeSimilarUsersLSH();
+        //generateUserGenreMatrix();
+        //computeSimilarUsersLSH();
 
         System.out.println(globalMovieRatingsAverage);
         System.out.println(moviesMap.get(1).getAverageRating());
         System.out.println(userRatingsMap[6].getAverageRating());
 
+        System.out.println(moviesMap.get(1).calculateRatingDeviation(moviesMap.get(1).getAverageRating(), globalMovieRatingsAverage));
+        System.out.println(moviesMap.get(1).getRatingDeviation());
+
+        System.out.println(userRatingsMap[6].calculateRatingDeviation(userRatingsMap[6].getAverageRating(), globalMovieRatingsAverage));
+        System.out.println(userRatingsMap[6].getRatingDeviation());
+
+        movieMovieFiltering();
+        //System.out.println(Arrays.toString(moviesMap.get(1).getRatingsVector()));
         //getRecommendedMoviesFromSimilarUsers();
         //computeRecommendedMoviesFromSimilarUsers(6);
         //getRecommendedMovies(6);
@@ -75,21 +88,22 @@ public class Main {
                 String[] rating = line.split(cvsSplitBy);
 
                 User tmp = new User(Integer.parseInt(rating[0]));
+                int userId = tmp.getUserId();
 
                 int movieId = Integer.parseInt(rating[1]);
                 float movieRating = Float.parseFloat(rating[2]);
                 String timestamp = rating[3];
 
-                if (userRatingsMap[tmp.getUserId()] != null) {
-                    userRatingsMap[tmp.getUserId()].addRating(movieId, movieRating, timestamp);
+                if (userRatingsMap[userId] != null) {
+                    userRatingsMap[userId].addRating(movieId, movieRating, timestamp);
                 }
                 else {
                     tmp.addRating(movieId, movieRating, timestamp);
-                    userRatingsMap[tmp.getUserId()] = tmp;
+                    userRatingsMap[userId] = tmp;
                 }
 
                 // add current rating to the movie object to calculate average ratings
-                moviesMap.get(movieId).addRating(movieRating);
+                moviesMap.get(movieId).addRating(userId, movieRating);
 
                 totalRating += Float.parseFloat(rating[2]);
                 ratingCount++;
@@ -147,7 +161,7 @@ public class Main {
         int count = 0;
 
         for (Rating rating: user.getRatings()) {
-            if (moviesMap.get(rating.getMovieId()).getGenres().contains(genre)) {
+            if (moviesMap.get(rating.getId()).getGenres().contains(genre)) {
                 total += rating.getRating();
                 count ++;
             }
@@ -158,7 +172,7 @@ public class Main {
 
     private static void computeSimilarUsersLSH() {
         for (int i = 1; i < userGenresMap.length; i++) {
-            int[] hash = lsh.hash(userGenresMap[i]);
+            int[] hash = userUserLSH.hash(userGenresMap[i]);
             int bucket = hash[hash.length - 1];
             addSimilarUsers(bucket, i);
             userRatingsMap[i].setLSHBucket(bucket);
@@ -166,20 +180,11 @@ public class Main {
     }
 
     private static void addSimilarUsers(Integer hashValue, Integer userId) {
-        if (userLSH.containsKey(hashValue)) {
-            if (!userLSH.get(hashValue).contains(userId)) {
-                userLSH.get(hashValue).add(userId);
-            }
-        }
-        else {
-            ArrayList<Integer> tmp = new ArrayList<>();
-            tmp.add(userId);
-            userLSH.put(hashValue, tmp);
-        }
+        addSimilarEntities(hashValue, userId, userLSH);
     }
 
     private static int getHashedBucketOfUser (int userId) {
-        int[] hash = lsh.hash(userGenresMap[userId]);
+        int[] hash = userUserLSH.hash(userGenresMap[userId]);
         return hash[0];
     }
 
@@ -218,8 +223,8 @@ public class Main {
         endTimer(start);
     }
 
-    private static void addRecommendedMovies(Integer userId, ArrayList<Rating> ratings) {
-        for (Rating r : ratings) {
+    private static void addRecommendedMovies(Integer userId, ArrayList<MovieRating> ratings) {
+        for (MovieRating r : ratings) {
             if (!userSimilarMoviesMap.get(userId).contains(r)) {
                 userSimilarMoviesMap.get(userId).add(r);
             }
@@ -229,10 +234,10 @@ public class Main {
     private static ArrayList<Movie> getRecommendedMovies(int userId) {
         System.out.println("getRecommendedMovies");
         ArrayList<Movie> movies = new ArrayList<>();
-        ArrayList<Rating> userRatings = userSimilarMoviesMap.get(userId);
+        ArrayList<MovieRating> userRatings = userSimilarMoviesMap.get(userId);
         for (Rating r : userRatings) {
             if (!userRatingsMap[userId].getRatings().contains(r))
-                movies.add(moviesMap.get(r.getMovieId()));
+                movies.add(moviesMap.get(r.getId()));
         }
 
         System.out.println(movies.size());
@@ -242,7 +247,36 @@ public class Main {
         return movies;
     }
 
-    private static void movieMovieFiltering() {
+    private static void movieMovieFiltering () {
+        long start = System.currentTimeMillis();
+        computeSimilarMoviesLSH();
+        endTimer(start);
+        System.out.println(Collections.singletonList(moviesLSH.get(1)));
+    }
 
+    private static void computeSimilarMoviesLSH () {
+        for (HashMap.Entry<Integer, Movie> movie: moviesMap.entrySet()) {
+            int[] hash = movieMovieLSH.hash(movie.getValue().getRatingsVector());
+            int bucket = hash[hash.length - 1];
+            addSimilarMovies(bucket, movie.getKey());
+            moviesMap.get(movie.getKey()).setLSHBucket(bucket);
+        }
+    }
+
+    private static void addSimilarMovies(int bucket, int movieId) {
+        addSimilarEntities(bucket, movieId, moviesLSH);
+    }
+
+    private static void addSimilarEntities(int bucket, int id, HashMap<Integer, ArrayList<Integer>> map) {
+        if (map.containsKey(bucket)) {
+            if (!map.get(bucket).contains(id)) {
+                map.get(bucket).add(id);
+            }
+        }
+        else {
+            ArrayList<Integer> tmp = new ArrayList<>();
+            tmp.add(id);
+            map.put(bucket, tmp);
+        }
     }
 }

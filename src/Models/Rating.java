@@ -1,18 +1,16 @@
 package Models;
 
-public class Rating {
-    private int movieId;
+public abstract class Rating {
+    private int id;
     private float rating;
-    private String timestamp;
 
-    Rating(int movieId, float rating, String timestamp) {
-        this.movieId = movieId;
+    Rating(int id, float rating) {
+        this.id = id;
         this.rating = rating;
-        this.timestamp = timestamp;
     }
 
-    public int getMovieId() {
-        return movieId;
+    public int getId() {
+        return id;
     }
 
     public float getRating() {
@@ -23,15 +21,11 @@ public class Rating {
         this.rating = rating;
     }
 
-    public String getTimestamp() {
-        return timestamp;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof Rating) {
             Rating r = (Rating) obj;
-            return this.movieId == r.getMovieId();
+            return this.id == r.getId();
         }
         return false;
     }

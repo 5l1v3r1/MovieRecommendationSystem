@@ -4,21 +4,15 @@ package Models;
 import java.util.ArrayList;
 
 public class User extends Entity {
-    private ArrayList<Rating> ratings;
-    private int LSHBucket;
-    private float averageRating;
-    private float ratingDeviation;
+    private ArrayList<MovieRating> ratings;
 
     public User(int userId) {
         super(userId);
         this.ratings = new ArrayList<>();
-        LSHBucket = -1;
-        averageRating = -1;
-        ratingDeviation = 0.0f;
     }
 
     public void addRating(int movieId, float rating, String timestamp) {
-        Rating tmp = new Rating(movieId, rating, timestamp);
+        MovieRating tmp = new MovieRating(movieId, rating, timestamp);
         ratings.add(tmp);
     }
 
@@ -26,13 +20,13 @@ public class User extends Entity {
         return super.getId();
     }
 
-    public ArrayList<Rating> getRatings() {
+    public ArrayList<MovieRating> getRatings() {
         return ratings;
     }
 
-    public ArrayList<Rating> getRatings(float threshold) {
-        ArrayList<Rating> tmp = new ArrayList<>();
-        for (Rating rating: ratings) {
+    public ArrayList<MovieRating> getRatings(float threshold) {
+        ArrayList<MovieRating> tmp = new ArrayList<>();
+        for (MovieRating rating: ratings) {
             if (rating.getRating() > threshold) {
                 tmp.add(rating);
             }
@@ -49,22 +43,10 @@ public class User extends Entity {
         }
 
         float averageRating = total / count;
-        this.averageRating = averageRating;
+        super.setAverageRating(averageRating);
 
         for (Rating rating : ratings) {
             rating.setRating(rating.getRating() - averageRating);
         }
-    }
-
-    public int getLSHBucket() {
-        return LSHBucket;
-    }
-
-    public void setLSHBucket(int LSHBucket) {
-        this.LSHBucket = LSHBucket;
-    }
-
-    public float getAverageRating() {
-        return averageRating;
     }
 }
