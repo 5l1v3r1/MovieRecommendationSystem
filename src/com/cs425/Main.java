@@ -46,7 +46,7 @@ public class Main {
 
     private static LSHSuperBit userUserLSH = new LSHSuperBit(31, 1488, GENRES.length);
 
-    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(30, 100, 10000);
+    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(2, 2, 2);
 
     private static float globalMovieRatingsAverage = 0.0f;
 
@@ -79,7 +79,7 @@ public class Main {
     }
 
     private static void readRatingsCSV() {
-        String csvFile = "/Users/boran/Desktop/CS425-Project/ml-20m/ratings.csv";
+        String csvFile = "/Users/boranyildirim/Downloads/ml-20m/ratings.csv";
         String line = "";
         String cvsSplitBy = ",";
 
@@ -133,7 +133,7 @@ public class Main {
     }
 
     private static void readMoviesCSV() {
-        String csvFile = "/Users/boran/Desktop/CS425-Project/ml-20m/movies.csv";
+        String csvFile = "/Users/boranyildirim/Downloads/ml-20m/movies.csv";
         String line = "";
         String cvsSplitBy = ",";
 
@@ -272,14 +272,38 @@ public class Main {
         User user = userRatingsMap[i];
         ArrayList<MovieRating> ratings = user.getRatings(0.75f);
 
+        long sbstart = System.currentTimeMillis();
+        SuperBit sb = new SuperBit(1000);
+        endTimer(sbstart);
+
+        boolean[] v1 = sb.signature(moviesMap.get(1).getRatingsVector());
+        boolean[] v2 = sb.signature(moviesMap.get(10).getRatingsVector());
+
+        long start = System.currentTimeMillis();
+        double estimSim = sb.similarity(v1, v2);
+        endTimer(start);
+
+        long startCos = System.currentTimeMillis();
+        double[] vc1 = IntStream.range(0, moviesMap.get(1).getRatingsVector().length).mapToDouble(j -> moviesMap.get(1).getRatingsVector()[j]).toArray();
+        double[] vc2 = IntStream.range(0, moviesMap.get(10).getRatingsVector().length).mapToDouble(j -> moviesMap.get(10).getRatingsVector()[j]).toArray();
+        double cosineSim = SuperBit.cosineSimilarity(vc1, vc2);
+        endTimer(startCos);
+
+        System.out.println(estimSim);
+        System.out.println(cosineSim);
+
+
+/*
         for (HashMap.Entry<Integer, Movie> movie: moviesMap.entrySet()) {
             if (!ratings.contains(movie.getValue())) {
-                double[] v1 = IntStream.range(0, movie.getValue().getRatingsVector().length).mapToDouble(j -> movie.getValue().getRatingsVector()[j]).toArray();
-
+                boolean[] v1 = sb.signature(movie.getValue().getRatingsVector());
                 for (Rating r: ratings) {
-                    double[] v2 = IntStream.range(0, moviesMap.get(r.getId()).getRatingsVector().length).mapToDouble(j -> moviesMap.get(r.getId()).getRatingsVector()[j]).toArray();
 
-                    double cosineSim = SuperBit.cosineSimilarity(v1, v2);
+                    boolean[] v2 = sb.signature(moviesMap.get(r.getId()).getRatingsVector());
+
+                    long start = System.currentTimeMillis();
+                    double cosineSim = sb.similarity(v1, v2);
+                    endTimer(start);
                     if (cosineSim > 0.4) {
                         System.out.println("UnwatchedMovie: " + movie.getValue().getTitle() + " is similar to " +
                                 moviesMap.get(r.getId()).getTitle() + " with cosine similarity " + cosineSim);
@@ -292,7 +316,7 @@ public class Main {
                     }
                 }
             }
-        }
+        }*/
     }
 
     private static void computeSimilarMoviesLSH () {

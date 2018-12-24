@@ -9,6 +9,10 @@ public class SuperBit {
     private double[][] hyperplanes;
     private static final int DEFAULT_CODE_LENGTH = 10000;
 
+    public SuperBit(final int d) {
+        this(d, d, DEFAULT_CODE_LENGTH / d);
+    }
+
     SuperBit(final int d, final int n, final int l) {
         this(d, n, l, new Random());
     }
@@ -41,7 +45,7 @@ public class SuperBit {
 
         double[][] v = new double[code_length][d];
 
-        new Thread(() -> {
+        Thread thread1 = new Thread(() -> {
             for (int i = 0; i < code_length / 4; i++) {
                 double[] vector = new double[d];
                 for (int j = 0; j < d; j++) {
@@ -51,9 +55,9 @@ public class SuperBit {
                 normalize(vector);
                 v[i] = vector;
             }
-        }).start();
+        });
 
-        new Thread(() -> {
+        Thread thread2 = new Thread(() -> {
             for (int i = code_length / 4; i < code_length / 2; i++) {
                 double[] vector = new double[d];
                 for (int j = 0; j < d; j++) {
@@ -63,9 +67,9 @@ public class SuperBit {
                 normalize(vector);
                 v[i] = vector;
             }
-        }).start();
+        });
 
-        new Thread(() -> {
+        Thread thread3 = new Thread(() -> {
             for (int i = code_length / 2; i < 3 * code_length / 4; i++) {
                 double[] vector = new double[d];
                 for (int j = 0; j < d; j++) {
@@ -75,9 +79,9 @@ public class SuperBit {
                 normalize(vector);
                 v[i] = vector;
             }
-        }).start();
+        });
 
-        new Thread(() -> {
+        Thread thread4 = new Thread(() -> {
             for (int i = 3 * code_length / 4; i < code_length; i++) {
                 double[] vector = new double[d];
                 for (int j = 0; j < d; j++) {
@@ -87,7 +91,9 @@ public class SuperBit {
                 normalize(vector);
                 v[i] = vector;
             }
-        }).start();
+        });
+
+        runAndJoinThreads(thread1, thread2, thread3, thread4);
 
 
         // for i = 0 to L - 1 do
@@ -102,36 +108,123 @@ public class SuperBit {
         // Output: H˜ = [w1, w2, ..., wK]
         double[][] w = new double[code_length][d];
         for (int i = 0; i <= l - 1; i++) {
-            for (int j = 1; j <= n; j++) {
-                double[] src = v[i * n + j - 1];
-                double[] dest = w[i * n + j - 1];
-                java.lang.System.arraycopy(
-                        src,
-                        0,
-                        dest,
-                        0,
-                        d);
 
-                for (int k = 1; k <= (j - 1); k++) {
-                    double[] v1 = w[i * n + k - 1];
-                    dest = sub(
+            int finalI = i;
+            thread1 = new Thread(() -> {
+                for (int j = 1; j <= n / 4; j++) {
+                    double[] src = v[finalI * n + j - 1];
+                    double[] dest = w[finalI * n + j - 1];
+                    java.lang.System.arraycopy(
+                            src,
+                            0,
                             dest,
-                            product(
-                                    dotProduct(
-                                            v1,
-                                            src),
-                                    v1));
+                            0,
+                            d);
+
+                    for (int k = 1; k <= (j - 1); k++) {
+                        double[] v1 = w[finalI * n + k - 1];
+                        dest = sub(
+                                dest,
+                                product(
+                                        dotProduct(
+                                                v1,
+                                                src),
+                                        v1));
+                    }
+
+                    normalize(dest);
+
                 }
+            });
 
-                normalize(dest);
+            thread2 = new Thread(() -> {
+                for (int j = n / 4 + 1; j <= n / 2; j++) {
+                    double[] src = v[finalI * n + j - 1];
+                    double[] dest = w[finalI * n + j - 1];
+                    java.lang.System.arraycopy(
+                            src,
+                            0,
+                            dest,
+                            0,
+                            d);
 
-            }
+                    for (int k = 1; k <= (j - 1); k++) {
+                        double[] v1 = w[finalI * n + k - 1];
+                        dest = sub(
+                                dest,
+                                product(
+                                        dotProduct(
+                                                v1,
+                                                src),
+                                        v1));
+                    }
+
+                    normalize(dest);
+
+                }
+            });
+
+            thread3 = new Thread(() -> {
+                for (int j = n / 2 + 1; j <= 3 * n / 4; j++) {
+                    double[] src = v[finalI * n + j - 1];
+                    double[] dest = w[finalI * n + j - 1];
+                    java.lang.System.arraycopy(
+                            src,
+                            0,
+                            dest,
+                            0,
+                            d);
+
+                    for (int k = 1; k <= (j - 1); k++) {
+                        double[] v1 = w[finalI * n + k - 1];
+                        dest = sub(
+                                dest,
+                                product(
+                                        dotProduct(
+                                                v1,
+                                                src),
+                                        v1));
+                    }
+
+                    normalize(dest);
+
+                }
+            });
+
+            thread4 = new Thread(() -> {
+                for (int j = 3 * n / 4 + 1; j <= n; j++) {
+                    double[] src = v[finalI * n + j - 1];
+                    double[] dest = w[finalI * n + j - 1];
+                    java.lang.System.arraycopy(
+                            src,
+                            0,
+                            dest,
+                            0,
+                            d);
+
+                    for (int k = 1; k <= (j - 1); k++) {
+                        double[] v1 = w[finalI * n + k - 1];
+                        dest = sub(
+                                dest,
+                                product(
+                                        dotProduct(
+                                                v1,
+                                                src),
+                                        v1));
+                    }
+
+                    normalize(dest);
+
+                }
+            });
+
+            runAndJoinThreads(thread1, thread2, thread3, thread4);
         }
 
         this.hyperplanes = w;
     }
 
-    final boolean[] signature(final float[] vector) {
+    public final boolean[] signature(final float[] vector) {
         boolean[] sig = new boolean[this.hyperplanes.length];
 
         Thread thread1 = new Thread(() -> {
@@ -160,7 +253,6 @@ public class SuperBit {
 
         runAndJoinThreads(thread1, thread2, thread3, thread4);
 
-
         return sig;
     }
 
@@ -186,6 +278,20 @@ public class SuperBit {
             v[i] = vector.get(i);
         }
         return v;
+    }
+
+    public final double similarity(final boolean[] sig1, final boolean[] sig2) {
+
+        double agg = 0;
+        for (int i = 0; i < sig1.length; i++) {
+            if (sig1[i] == sig2[i]) {
+                agg++;
+            }
+        }
+
+        agg = agg / sig1.length;
+
+        return Math.cos((1 - agg) * Math.PI);
     }
 
     /* ---------------------- STATIC ---------------------- */

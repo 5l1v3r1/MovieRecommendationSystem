@@ -55,7 +55,7 @@ public class Movie extends Entity{
     }
 
     public float[] getRatingsVector() {
-        float[] tmp = new float[10000];
+        float[] tmp = new float[1000];
 /*
         new Thread(() -> {
             for (int i = 0; i < 2500; i++) {
@@ -81,7 +81,7 @@ public class Movie extends Entity{
             }
         }).start();
 */
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 1000; i++) {
             tmp[i] = ratings.getOrDefault(i, 0.0f);
         }
 
