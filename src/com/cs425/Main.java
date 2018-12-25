@@ -61,8 +61,12 @@ public class Main {
             e.printStackTrace();
         }
 
+        // start after movies and ratings are read
+        Thread thread4 = new Thread(Main::computeRatingDeviations);
+
         Thread thread2 = new Thread(() -> {
             readRatingsCSV();
+            thread4.start();
             generateUserGenreMatrix();
             computeSimilarUsersLSH();
         });
@@ -75,6 +79,7 @@ public class Main {
         try {
             thread2.join();
             thread3.join();
+            thread4.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -108,7 +113,7 @@ public class Main {
     }
 
     private static void readRatingsCSV() {
-        String csvFile = "/Users/boranyildirim/Downloads/ml-20m/ratings.csv";
+        String csvFile = "/Users/boranyildirim/Desktop/MovieRecommendationSystem/dataset/ratings.csv";
         String line = "";
         String cvsSplitBy = ",";
 
@@ -162,7 +167,7 @@ public class Main {
     }
 
     private static void readMoviesCSV() {
-        String csvFile = "/Users/boranyildirim/Downloads/ml-20m/movies.csv";
+        String csvFile = "/Users/boranyildirim/Desktop/MovieRecommendationSystem/dataset/movies.csv";
         String line = "";
         String cvsSplitBy = ",";
 
@@ -269,7 +274,6 @@ public class Main {
     }
 
     private static ArrayList<Movie> getRecommendedMovies(int userId) {
-        System.out.println("getRecommendedMovies");
         ArrayList<Movie> movies = new ArrayList<>();
         ArrayList<MovieRating> userRatings = userSimilarMoviesMap.get(userId);
         for (MovieRating r : userRatings) {
@@ -303,13 +307,12 @@ public class Main {
     }
 
     private static void computeBaselineRatings(int i) {
-        computeRatingDeviations();
         int deletedBucket = deleteSparseBucket();
 
         User user = userRatingsMap[i];
         ArrayList<MovieRating> ratings = user.getRatings();
 
-        ArrayList<MovieSim> similarList;
+        ArrayList<MovieSim> similarList = new ArrayList<>();
         ArrayList<MovieEstimate> estimates = new ArrayList<>();
 
         for (HashMap.Entry<Integer, Movie> movie: moviesMap.entrySet()) {
@@ -318,7 +321,6 @@ public class Main {
                 int hash[] = movieMovieLSH.hash(movie.getValue().getRatingsVector());
                 int bucket = hash[hash.length - 1];
                 if (bucket != deletedBucket) {
-                    similarList = new ArrayList<>();
                     ArrayList<Integer> list = moviesLSH.get(bucket);
 
                     boolean[] v1 = sb.signature(movie.getValue().getRatingsVector());
@@ -346,19 +348,16 @@ public class Main {
                         }
                     }
                     if (similarList.size() > CF) {
-                        similarList.sort(Comparator.comparing(m -> m.cosineSim));
+                        similarList.sort(Comparator.comparing((MovieSim m) -> m.cosineSim));
                         double numerator = 0;
                         double denominator = 0;
                         for (int j = 1; j < CF; j++) {
                             MovieSim current = similarList.get(similarList.size() - j);
-                            float bxk = (globalMovieRatingsAverage + user.getRatingDeviation() +
-                                    moviesMap.get(current.getMovieId()).getRatingDeviation());
-
-                            numerator += current.cosineSim * bxk;
+                            numerator += current.cosineSim * moviesMap.get(current.getMovieId()).getRatingDeviation() ;
                             denominator += current.cosineSim;
                         }
-
-                        estimates.add(new MovieEstimate(movie.getKey(), numerator / denominator));
+                        float bxi = globalMovieRatingsAverage + user.getRatingDeviation() + moviesMap.get(movie.getKey()).getRatingDeviation();
+                        estimates.add(new MovieEstimate(movie.getKey(), bxi + numerator / denominator));
                     }
                 }
             }
