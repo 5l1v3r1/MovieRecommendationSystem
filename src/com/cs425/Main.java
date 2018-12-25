@@ -2,21 +2,18 @@ package com.cs425;
 
 import LSH.LSHSuperBit;
 import LSH.SuperBit;
-import Models.Movie;
-import Models.MovieRating;
-import Models.Rating;
-import Models.User;
+import Models.*;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.stream.IntStream;
 
 public class Main {
 
     // +1 for id convenience
     public final static int USER_NUMBER = 138494;
+
+    private final static int CF = 2;
 
     private final static String[] GENRES =
             {"Action", "Adventure", "Animation",
@@ -46,36 +43,68 @@ public class Main {
 
     private static LSHSuperBit userUserLSH = new LSHSuperBit(31, 1488, GENRES.length);
 
-    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(2, 2, 2);
+    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(30, 100, 1000);
+    static SuperBit sb;
 
     private static float globalMovieRatingsAverage = 0.0f;
 
+
     public static void main(String[] args) {
-        //fillUserSimilarMoviesMap();
-        readMoviesCSV();
-        readRatingsCSV();
-        //generateUserGenreMatrix();
-        //computeSimilarUsersLSH();
+        fillUserSimilarMoviesMap();
+        Thread thread1 = new Thread(Main::readMoviesCSV);
 
-        System.out.println(globalMovieRatingsAverage);
-        System.out.println(moviesMap.get(1).getAverageRating());
-        System.out.println(userRatingsMap[6].getAverageRating());
+        thread1.start();
 
-        System.out.println(moviesMap.get(1).calculateRatingDeviation(moviesMap.get(1).getAverageRating(), globalMovieRatingsAverage));
-        System.out.println(moviesMap.get(1).getRatingDeviation());
+        try {
+            thread1.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-        System.out.println(userRatingsMap[6].calculateRatingDeviation(userRatingsMap[6].getAverageRating(), globalMovieRatingsAverage));
-        System.out.println(userRatingsMap[6].getRatingDeviation());
+        Thread thread2 = new Thread(() -> {
+            readRatingsCSV();
+            generateUserGenreMatrix();
+            computeSimilarUsersLSH();
+        });
 
-        computeBaselineRatings(2);
-        computeBaselineRatings(6);
-        computeBaselineRatings(50);
-        //movieMovieFiltering();
-        //System.out.println(Collections.singletonList(moviesLSH.get(1)));
-        //System.out.println(Arrays.toString(moviesMap.get(1).getRatingsVector()));
-        //getRecommendedMoviesFromSimilarUsers();
-        //computeRecommendedMoviesFromSimilarUsers(6);
-        //getRecommendedMovies(6);
+        Thread thread3 = new Thread(Main::movieMovieFiltering);
+
+        thread2.start();
+        thread3.start();
+
+        try {
+            thread2.join();
+            thread3.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        sb = movieMovieLSH.getSb();
+
+        System.out.println("select case: user-user(1), item-item(2)");
+        Scanner scanner = new Scanner(System.in);
+        int menu = scanner.nextInt();
+        int choice;
+
+        while (menu != -1) {
+            switch (menu) {
+                case 1:
+                    System.out.println("enter userId");
+                    choice = scanner.nextInt();
+                    computeRecommendedMoviesFromSimilarUsers(choice);
+                    System.out.println(Collections.singletonList(getRecommendedMovies(choice)));
+                    System.out.println("select case: user-user(1), item-item(2)");
+                    menu = scanner.nextInt();
+                    break;
+                case 2:
+                    System.out.println("enter userId");
+                    choice = scanner.nextInt();
+                    computeBaselineRatings(choice);
+                    System.out.println("select case: user-user(1), item-item(2)");
+                    menu = scanner.nextInt();
+                    break;
+            }
+        }
     }
 
     private static void readRatingsCSV() {
@@ -248,18 +277,23 @@ public class Main {
                 movies.add(moviesMap.get(r.getId()));
         }
 
-        System.out.println(movies.size());
-        for (Movie m: movies) {
-            System.out.println(m.getMovieId() + ", " + m.getTitle());
-        }
         return movies;
     }
 
     private static void movieMovieFiltering () {
         long start = System.currentTimeMillis();
-        //computeSimilarMoviesLSH();
+        computeSimilarMoviesLSH();
         endTimer(start);
         System.out.println(Collections.singletonList(moviesLSH.get(1)));
+    }
+
+    private static void computeRatingDeviations() {
+        for (int i = 1; i < USER_NUMBER; i++) {
+            userRatingsMap[i].calculateRatingDeviation(userRatingsMap[i].getAverageRating(), globalMovieRatingsAverage);
+        }
+        for (HashMap.Entry<Integer, Movie> movie: moviesMap.entrySet()) {
+            movie.getValue().calculateRatingDeviation(movie.getValue().getAverageRating(), globalMovieRatingsAverage);
+        }
     }
 
     private static void computeBaselineRatings() {
@@ -269,54 +303,86 @@ public class Main {
     }
 
     private static void computeBaselineRatings(int i) {
+        computeRatingDeviations();
+        int deletedBucket = deleteSparseBucket();
+
         User user = userRatingsMap[i];
-        ArrayList<MovieRating> ratings = user.getRatings(0.75f);
+        ArrayList<MovieRating> ratings = user.getRatings();
 
-        long sbstart = System.currentTimeMillis();
-        SuperBit sb = new SuperBit(1000);
-        endTimer(sbstart);
+        ArrayList<MovieSim> similarList;
+        ArrayList<MovieEstimate> estimates = new ArrayList<>();
 
-        boolean[] v1 = sb.signature(moviesMap.get(1).getRatingsVector());
-        boolean[] v2 = sb.signature(moviesMap.get(10).getRatingsVector());
-
-        long start = System.currentTimeMillis();
-        double estimSim = sb.similarity(v1, v2);
-        endTimer(start);
-
-        long startCos = System.currentTimeMillis();
-        double[] vc1 = IntStream.range(0, moviesMap.get(1).getRatingsVector().length).mapToDouble(j -> moviesMap.get(1).getRatingsVector()[j]).toArray();
-        double[] vc2 = IntStream.range(0, moviesMap.get(10).getRatingsVector().length).mapToDouble(j -> moviesMap.get(10).getRatingsVector()[j]).toArray();
-        double cosineSim = SuperBit.cosineSimilarity(vc1, vc2);
-        endTimer(startCos);
-
-        System.out.println(estimSim);
-        System.out.println(cosineSim);
-
-
-/*
         for (HashMap.Entry<Integer, Movie> movie: moviesMap.entrySet()) {
-            if (!ratings.contains(movie.getValue())) {
-                boolean[] v1 = sb.signature(movie.getValue().getRatingsVector());
-                for (Rating r: ratings) {
+            MovieRating tmp = new MovieRating(movie.getValue().getMovieId());
+            if (!ratings.contains(tmp)) {
+                int hash[] = movieMovieLSH.hash(movie.getValue().getRatingsVector());
+                int bucket = hash[hash.length - 1];
+                if (bucket != deletedBucket) {
+                    similarList = new ArrayList<>();
+                    ArrayList<Integer> list = moviesLSH.get(bucket);
 
-                    boolean[] v2 = sb.signature(moviesMap.get(r.getId()).getRatingsVector());
+                    boolean[] v1 = sb.signature(movie.getValue().getRatingsVector());
+                    for (Integer movieId : list) {
+                        tmp = new MovieRating(movieId);
+                        if (ratings.contains(tmp)) {
+                            boolean[] v2 = sb.signature(moviesMap.get(movieId).getRatingsVector());
+                            double cosineSim = sb.similarity(v1, v2);
 
-                    long start = System.currentTimeMillis();
-                    double cosineSim = sb.similarity(v1, v2);
-                    endTimer(start);
-                    if (cosineSim > 0.4) {
-                        System.out.println("UnwatchedMovie: " + movie.getValue().getTitle() + " is similar to " +
-                                moviesMap.get(r.getId()).getTitle() + " with cosine similarity " + cosineSim);
-                        float bxi = (globalMovieRatingsAverage + user.getRatingDeviation() + movie.getValue().getRatingDeviation());
-                        System.out.println("Baseline estimate for user " + user.getUserId() + " movie " + movie.getValue().getTitle() +
-                                " is " + bxi );
-                        System.out.println("Baseline rating plus the weighted avg of deviations is " +
-                                bxi + ((cosineSim * movie.getValue().getRatingDeviation()) + (cosineSim * moviesMap.get(r.getId()).getRatingDeviation())) / (cosineSim * 2) );
-                        System.out.println();
+                            MovieSim movieSim = new MovieSim(tmp.getId(), cosineSim);
+                            similarList.add(movieSim);
+/*
+                            if (cosineSim > 0.4 && cosineSim < 1.0) {
+                                System.out.println("UnwatchedMovie: " + movie.getValue().getTitle() + " is similar to " +
+                                        moviesMap.get(movieId).getTitle() + " with cosine similarity " + cosineSim);
+                                float bxi = (globalMovieRatingsAverage + user.getRatingDeviation() +
+                                        movie.getValue().getRatingDeviation());
+                                System.out.println("Baseline estimate for user " + user.getUserId() + " movie " +
+                                        movie.getValue().getTitle() + " is " + bxi);
+                                System.out.println("Baseline rating plus the weighted avg of deviations is " +
+                                        bxi + ((cosineSim * movie.getValue().getRatingDeviation()) +
+                                        (cosineSim * moviesMap.get(movieId).getRatingDeviation())) / (cosineSim * 2));
+                                System.out.println();
+                            }*/
+                        }
+                    }
+                    if (similarList.size() > CF) {
+                        similarList.sort(Comparator.comparing(m -> m.cosineSim));
+                        double numerator = 0;
+                        double denominator = 0;
+                        for (int j = 1; j < CF; j++) {
+                            MovieSim current = similarList.get(similarList.size() - j);
+                            float bxk = (globalMovieRatingsAverage + user.getRatingDeviation() +
+                                    moviesMap.get(current.getMovieId()).getRatingDeviation());
+
+                            numerator += current.cosineSim * bxk;
+                            denominator += current.cosineSim;
+                        }
+
+                        estimates.add(new MovieEstimate(movie.getKey(), numerator / denominator));
                     }
                 }
             }
-        }*/
+        }
+
+        estimates.sort(Comparator.comparing(e -> e.estimateRating));
+
+        for (int j = 1; j <= estimates.size(); j++) {
+            System.out.println(estimates.get(j - 1));
+            //System.out.println(moviesMap.get(estimates.get(estimates.size() - j).movieId));
+        }
+    }
+
+    static int deleteSparseBucket() {
+        int maxSize = Integer.MIN_VALUE;
+        int maxBucket = -1;
+        for (HashMap.Entry<Integer, ArrayList<Integer>> bucket: moviesLSH.entrySet()) {
+            if (bucket.getValue().size() > maxSize) {
+                maxSize = bucket.getValue().size();
+                maxBucket = bucket.getKey();
+            }
+        }
+        moviesLSH.remove(maxBucket);
+        return maxBucket;
     }
 
     private static void computeSimilarMoviesLSH () {

@@ -87,4 +87,13 @@ public class Movie extends Entity{
 
         return tmp;
     }
+
+    @Override
+    public String toString() {
+        return "Movie{" +
+                "id= " + super.getId() +
+                " title= '" + title + '\'' +
+                ", genres= " + genres +
+                '}';
+    }
 }

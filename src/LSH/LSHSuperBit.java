@@ -47,4 +47,8 @@ public class LSHSuperBit extends LSH {
         float[] d = SuperBit.listToArray(vector);
         return hash(d);
     }
+
+    public SuperBit getSb() {
+        return sb;
+    }
 }

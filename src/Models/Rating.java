@@ -4,6 +4,11 @@ public abstract class Rating {
     private int id;
     private float rating;
 
+    Rating (int id) {
+        this.id = id;
+        rating = 0;
+    }
+
     Rating(int id, float rating) {
         this.id = id;
         this.rating = rating;
