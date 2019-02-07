@@ -43,7 +43,7 @@ public class Main {
 
     private static LSHSuperBit userUserLSH = new LSHSuperBit(31, 1488, GENRES.length);
 
-    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(30, 100, 1000);
+    private static LSHSuperBit movieMovieLSH = new LSHSuperBit(30, 100, 2000);
     static SuperBit sb;
 
     private static float globalMovieRatingsAverage = 0.0f;
@@ -332,19 +332,6 @@ public class Main {
 
                             MovieSim movieSim = new MovieSim(tmp.getId(), cosineSim);
                             similarList.add(movieSim);
-/*
-                            if (cosineSim > 0.4 && cosineSim < 1.0) {
-                                System.out.println("UnwatchedMovie: " + movie.getValue().getTitle() + " is similar to " +
-                                        moviesMap.get(movieId).getTitle() + " with cosine similarity " + cosineSim);
-                                float bxi = (globalMovieRatingsAverage + user.getRatingDeviation() +
-                                        movie.getValue().getRatingDeviation());
-                                System.out.println("Baseline estimate for user " + user.getUserId() + " movie " +
-                                        movie.getValue().getTitle() + " is " + bxi);
-                                System.out.println("Baseline rating plus the weighted avg of deviations is " +
-                                        bxi + ((cosineSim * movie.getValue().getRatingDeviation()) +
-                                        (cosineSim * moviesMap.get(movieId).getRatingDeviation())) / (cosineSim * 2));
-                                System.out.println();
-                            }*/
                         }
                     }
                     if (similarList.size() > CF) {
